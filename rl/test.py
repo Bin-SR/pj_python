@@ -1,3 +1,4 @@
 import numpy as np
 print("hello")
-print(123)
+q = np.random.rand(2, 2)
+print(q)
