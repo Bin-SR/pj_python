@@ -9,8 +9,8 @@ print(tokenizer.tokenize(text))
 print(tokenizer.encode(text))
 
 
-# model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
-
+model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
+print(model)
 # embedding = model.model.embed_tokens
 # print(embedding.weight.shape)  
 # shape = torch.Size([151936, 896])
