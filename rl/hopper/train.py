@@ -19,10 +19,7 @@ def train():
     print(f"[设备] 使用: {device}")
 
     # 创建环境
-    env = make_hopper_env(
-        render_mode=config.RENDER_MODE,
-        max_episode_steps=config.MAX_EPISODE_STEPS,
-    )
+    env = make_hopper_env(render_mode=config.RENDER_MODE, max_episode_steps=config.MAX_EPISODE_STEPS)
     get_env_info(env)
     
     # 观测维度和动作维度
