@@ -94,11 +94,11 @@ class ActorNetwork(nn.Module):
 
         # 计算对数概率（对每个维度求和）
         log_prob = dist.log_prob(action).sum(dim=-1)
-        print("log_prob: ", log_prob, dist.log_prob(action))
+        # print("log_prob: ", log_prob, dist.log_prob(action))
         
         # 将动作裁剪到 [-1, 1]（tanh 压缩）
         action = torch.tanh(action)
-        print("action: ", action)
+        # print("action: ", action)
 
         return action, log_prob
 

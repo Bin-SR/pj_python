@@ -8,6 +8,7 @@ import numpy as np
 import torch
 
 from hopper_env import make_hopper_env
+from hopper_env_stand import make_hopper_stand_env
 from ppo_agent import PPOAgent
 import config
 
@@ -35,10 +36,7 @@ def evaluate(model_path=None, num_episodes=5, render=True):
 
     # 创建渲染环境
     render_mode = "human" if render else None
-    env = make_hopper_env(
-        render_mode=render_mode,
-        max_episode_steps=config.MAX_EPISODE_STEPS,
-    )
+    env = make_hopper_env(render_mode=render_mode, max_episode_steps=config.MAX_EPISODE_STEPS,)
 
     obs_dim = env.observation_space.shape[0]
     act_dim = env.action_space.shape[0]
