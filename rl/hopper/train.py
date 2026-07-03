@@ -7,9 +7,8 @@ import time
 import numpy as np
 import torch
 
-from hopper_env import make_hopper_env, get_env_info
-# from hopper_env_stand import make_hopper_stand_env, get_env_info
-
+from hopper_env import make_hopper_env
+from hopper_env_stand import make_hopper_stand_env, get_env_info
 from ppo_agent import PPOAgent
 import config
 
@@ -21,8 +20,8 @@ def train():
     print(f"[设备] 使用: {device}")
 
     # 创建环境
-    env = make_hopper_env(render_mode=config.RENDER_MODE, max_episode_steps=config.MAX_EPISODE_STEPS)
-    # env = make_hopper_stand_env(render_mode=config.RENDER_MODE, max_episode_steps=config.MAX_EPISODE_STEPS)
+    # env = make_hopper_env(render_mode=config.RENDER_MODE, max_episode_steps=config.MAX_EPISODE_STEPS)
+    env = make_hopper_stand_env(render_mode=config.RENDER_MODE, max_episode_steps=config.MAX_EPISODE_STEPS)
     get_env_info(env)
     
     # 观测维度和动作维度

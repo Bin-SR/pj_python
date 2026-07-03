@@ -1,7 +1,7 @@
 import gymnasium as gym
-
-env = gym.make("CartPole-v1", render_mode="human")
-
+# "Hopper-v5" "CartPole-v1"
+env = gym.make("Hopper-v5", render_mode="human")
+print(env.unwrapped.model)
 print(f"观测空间: {env.observation_space}")
 print(f"观测维度: {env.observation_space.shape[0]}")
 
