@@ -8,8 +8,12 @@ import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
 
-from ppo_networks import ActorNetwork, CriticNetwork
-from ppo_buffer import PPOBuffer
+from .ppo_networks import ActorNetwork, CriticNetwork
+from .ppo_buffer import PPOBuffer
+
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
 import config
 
 
@@ -227,4 +231,4 @@ class PPOAgent:
         self.critic_optimizer.load_state_dict(checkpoint["critic_opt"])
         print(f"[加载] 模型已从 {path} 加载")
 
-# agent = PPOAgent(11, 3)
+agent = PPOAgent(11, 3)

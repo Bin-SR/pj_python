@@ -170,7 +170,7 @@ class CriticNetwork(nn.Module):
 TEST = 0
 if TEST:
     print("**********ppo_networks.py : TEST*********")
-    from hopper_env import make_hopper_env, get_env_info
+    from hopper.hopper_env import make_hopper_env, get_env_info
     env = make_hopper_env()
     obs, info = env.reset()
     state_tensor = torch.FloatTensor(obs).unsqueeze(0)

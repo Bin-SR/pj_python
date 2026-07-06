@@ -7,9 +7,12 @@ import time
 import numpy as np
 import torch
 
-from hopper_env import make_hopper_env
-from hopper_env_stand import make_hopper_stand_env, get_env_info
-from ppo_agent import PPOAgent
+from hopper.hopper_env import make_hopper_env
+from hopper.hopper_env_stand import make_hopper_stand_env, get_env_info
+
+from walker.walker2d_env import make_walker_env, get_env_info
+
+from ppo.ppo_agent import PPOAgent
 import config
 
 
@@ -20,8 +23,7 @@ def train():
     print(f"[设备] 使用: {device}")
 
     # 创建环境
-    # env = make_hopper_env(render_mode=config.RENDER_MODE, max_episode_steps=config.MAX_EPISODE_STEPS)
-    env = make_hopper_stand_env(render_mode=config.RENDER_MODE, max_episode_steps=config.MAX_EPISODE_STEPS)
+    env = make_walker_env(render_mode=config.RENDER_MODE, max_episode_steps=config.MAX_EPISODE_STEPS)
     get_env_info(env)
     
     # 观测维度和动作维度
@@ -103,17 +105,17 @@ def train():
         # --- 保存最佳模型 ---
         if avg_reward > best_avg_reward and len(epoch_rewards) > 0:
             best_avg_reward = avg_reward
-            agent.save(os.path.join(config.SAVE_DIR, "hopper_ppo_best.pth"))
+            agent.save(os.path.join(config.SAVE_DIR, "walker_ppo_best.pth"))
 
         # --- 定期保存 ---
         if (epoch + 1) % config.SAVE_INTERVAL == 0:
             agent.save(
-                os.path.join(config.SAVE_DIR, f"hopper_ppo_epoch{epoch+1}.pth")
+                os.path.join(config.SAVE_DIR, f"walker_ppo_epoch{epoch+1}.pth")
             )
 
     # 训练结束
     total_time = time.time() - start_time
-    agent.save(os.path.join(config.SAVE_DIR, "hopper_ppo_final.pth"))
+    agent.save(os.path.join(config.SAVE_DIR, "hwalker_ppo_final.pth"))
 
     print(f"\n{'='*60}")
     print(f"训练完成！总耗时: {total_time:.1f}s")
