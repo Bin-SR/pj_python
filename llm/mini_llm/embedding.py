@@ -7,8 +7,11 @@ class TokenEmbedding(nn.Module):
         super().__init__()
 
         self.embedding = nn.Embedding(config.vocab_size, config.hidden_size)
-
+        # self.embedding.weight是一个(vocab_size, hidden_size)的矩阵
+        
     def forward(self, input_ids):
+        # 返回值是，把输入input_ids的数据作为索引(input_ids中的数据，一定小于vocab_size)，在self.embedding.weight表中进行查询
+        # 因此nn.Embedding表示一个简单的查询表
         return self.embedding(input_ids)
 
 Test = 0

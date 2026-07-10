@@ -15,6 +15,8 @@ from hopper.hopper_env_stand import make_hopper_stand_env
 
 from walker.walker2d_env import make_walker_env, get_env_info
 
+from half_cheetah.halfCheetah_env import make_HalfCheetah_env
+
 from ppo.ppo_agent import PPOAgent
 import config
 
@@ -33,7 +35,7 @@ def evaluate(model_path=None, num_episodes=5, render=True):
 
     # 确定模型路径
     if model_path is None:
-        model_path = os.path.join(config.SAVE_DIR, "walker_ppo_epoch700.pth")
+        model_path = os.path.join(config.SAVE_DIR, "HalfCheetah_ppo_best.pth")
 
     if not os.path.exists(model_path):
         print(f"[错误] 模型文件不存在: {model_path}")
@@ -42,7 +44,7 @@ def evaluate(model_path=None, num_episodes=5, render=True):
 
     # 创建渲染环境
     render_mode = "human" if render else None
-    env = make_walker_env(render_mode=render_mode, max_episode_steps=config.MAX_EPISODE_STEPS,)
+    env = make_HalfCheetah_env(render_mode=render_mode, max_episode_steps=config.MAX_EPISODE_STEPS,)
 
     obs_dim = env.observation_space.shape[0]
     act_dim = env.action_space.shape[0]
@@ -97,7 +99,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="评估 PPO Hopper 模型")
-    parser.add_argument("--model", type=str, default=None,help="模型文件路径（默认加载 ./models/hopper_ppo_best.pth）")
+    parser.add_argument("--model", type=str, default=None)
     parser.add_argument("--episodes", type=int, default=5,help="评估的 episode 数量")
     parser.add_argument("--no-render", action="store_true",help="不渲染可视化")
     args = parser.parse_args()

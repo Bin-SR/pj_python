@@ -28,6 +28,6 @@ CRITIC_HIDDEN = [64, 64]        # Critic 隐藏层
 
 # ---------- 保存 & 日志 ----------
 SAVE_DIR = "C:/Disk/Data/New_Project/VScode_project/py/rl/gym_mj/models"         # 模型保存目录
-LOG_INTERVAL = 10               # 每 N 回合打印一次日志
+LOG_INTERVAL = 5               # 每 N 回合打印一次日志
 SAVE_INTERVAL = 100             # 每 N 回合保存一次模型
 EVAL_INTERVAL = 50              # 每 N 回合评估一次

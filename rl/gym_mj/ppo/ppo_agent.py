@@ -11,6 +11,7 @@ import numpy as np
 from .ppo_networks import ActorNetwork, CriticNetwork
 from .ppo_buffer import PPOBuffer
 
+# ！！！！ 调用config
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
