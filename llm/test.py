@@ -15,3 +15,4 @@ print(model)
 # print(embedding.weight.shape)  
 # shape = torch.Size([151936, 896])
 # 意思是词表大小：151936个词 每个词的维度：896
+
