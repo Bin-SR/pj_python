@@ -5,6 +5,7 @@ import mujoco.viewer
 from threading import Thread
 import threading
 
+import numpy as np
 # import rclpy
 # from rclpy.node import Node
 # from sensor_msgs.msg import JointState
@@ -96,14 +97,37 @@ class my_mujoco_env:
 
         return img
 
-TEST = 0
-if TEST:   
+TEST = 1
+if TEST: 
+    ARM_JOINT_NAMES = [
+    "joint1", "joint2", "joint3", "joint4",
+    "joint5", "joint6", "joint7"
+    ]  
+    ACTUATOR_NAMES = [
+    "actuator1", "actuator2", "actuator3", "actuator4",
+    "actuator5", "actuator6", "actuator7", "actuator8"
+    ]
     if __name__ == "__main__":
         _env = my_mujoco_env()
         mj_model = _env.model()
         mj_data = _env.data()
 
-        while True:
-            img = _env.get_rgb()
-            cv2.imshow("test", img)
-            cv2.waitKey(1)
+        _arm_joint_ids = [mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_JOINT, name) for name in ARM_JOINT_NAMES]
+        arm_qpos_adr = np.array([mj_model.jnt_qposadr[jid] for jid in _arm_joint_ids], dtype=np.int32)
+
+        _actuator_ids = np.array([mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in ACTUATOR_NAMES], dtype=np.int32)
+        print(type(_arm_joint_ids))
+        print(type(arm_qpos_adr))
+        print(_actuator_ids)
+
+        _cube_body_id = mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_BODY, "red_cube")
+        cube_pos = mj_data.body(_cube_body_id).xpos.copy()
+        print(cube_pos)
+
+        while False:
+            qpos = mj_data.qpos[arm_qpos_adr].copy()
+            print(np.round(qpos, 3))
+            time.sleep(1)
+            # img = _env.get_rgb()
+            # cv2.imshow("test", img)
+            # cv2.waitKey(1)

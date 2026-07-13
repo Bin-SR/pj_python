@@ -11,6 +11,9 @@ import cv2
 import mujoco
 import mujoco.viewer
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
 from vla.config import (
     SCENE_PATH, CAMERA_NAME,
     IMAGE_WIDTH, IMAGE_HEIGHT,
@@ -46,40 +49,22 @@ class VLAEnv:
 
         # ---- 获取关节在 qpos 中的地址 ----
         # 注意: mj_name2id 返回 joint index, qpos 地址需通过 jnt_qposadr 获取
-        self._arm_joint_ids = [
-            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, name)
-            for name in ARM_JOINT_NAMES
-        ]
-        self._arm_qpos_adr = np.array([
-            self.model.jnt_qposadr[jid] for jid in self._arm_joint_ids
-        ], dtype=np.int32)
-
-        self._gripper_joint_ids = [
-            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, name)
-            for name in GRIPPER_JOINT_NAMES
-        ]
-        self._gripper_qpos_adr = np.array([
-            self.model.jnt_qposadr[jid] for jid in self._gripper_joint_ids
-        ], dtype=np.int32)
+        # arm
+        self._arm_joint_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, name) for name in ARM_JOINT_NAMES]
+        self._arm_qpos_adr = np.array([self.model.jnt_qposadr[jid] for jid in self._arm_joint_ids], dtype=np.int32)
+        # gripper
+        self._gripper_joint_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, name)for name in GRIPPER_JOINT_NAMES]
+        self._gripper_qpos_adr = np.array([self.model.jnt_qposadr[jid] for jid in self._gripper_joint_ids], dtype=np.int32)
 
         # ---- 获取执行器索引 ----
-        self._actuator_ids = np.array([
-            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, name)
-            for name in ACTUATOR_NAMES
-        ], dtype=np.int32)
+        self._actuator_ids = np.array([mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in ACTUATOR_NAMES], dtype=np.int32)
 
         # ---- 获取 body 索引 ----
-        self._cube_body_id = mujoco.mj_name2id(
-            self.model, mujoco.mjtObj.mjOBJ_BODY, CUBE_BODY_NAME
-        )
-        self._hand_body_id = mujoco.mj_name2id(
-            self.model, mujoco.mjtObj.mjOBJ_BODY, "hand"
-        )
+        self._cube_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, CUBE_BODY_NAME)
+        self._hand_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "hand")
 
         # ---- 获取关节 DOF 地址 (用于 Jacobian) ----
-        self._arm_dof_adr = np.array([
-            self.model.jnt_dofadr[jid] for jid in self._arm_joint_ids
-        ], dtype=np.int32)
+        self._arm_dof_adr = np.array([self.model.jnt_dofadr[jid] for jid in self._arm_joint_ids], dtype=np.int32)
 
         # ---- 渲染器 ----
         self.renderer = mujoco.Renderer(self.model, IMAGE_HEIGHT, IMAGE_WIDTH)
@@ -109,6 +94,8 @@ class VLAEnv:
         while not self._stop:
             step_start = time.perf_counter()
             with self._lock:
+                # print(np.max(np.abs(self.data.qpos)))
+                # print(np.max(np.abs(self.data.qvel)))
                 mujoco.mj_step(self.model, self.data)
             elapsed = time.perf_counter() - step_start
             if elapsed < self.model.opt.timestep:
@@ -147,7 +134,13 @@ class VLAEnv:
                 self.data.qpos[cube_start_idx + 2] = float(CS)
 
             # 前向运动学
+            # 在reset中，使用mj_forward
             mujoco.mj_forward(self.model, self.data)
+            # ？？？？？？？？？？？？？？？？？？
+            # 关于mj_forward和mj_step的区别
+            # mj_forward根据当前状态计算机器人现在是什么样,不进行时间积分
+            # mj_step, 让时间往前走一步，更新状态，是一次完整的仿真循环
+            # ？？？？？？？？？？？？？？？？？？
 
         self._step_count = 0
         return self.get_observation()
@@ -167,9 +160,9 @@ class VLAEnv:
         with self._lock:
             # 设置控制信号 (执行器索引直接对应 ctrl 数组)
             for i in range(7):
-                self.data.ctrl[self._actuator_ids[i]] = action[i]
+                self.data.ctrl[self._actuator_ids[i]] = action[i] # 前七个控制器为arm
             # gripper ctrl
-            self.data.ctrl[self._actuator_ids[7]] = np.clip(action[7], 0.0, 255.0)
+            self.data.ctrl[self._actuator_ids[7]] = np.clip(action[7], 0.0, 255.0) # 第八个为gripper
 
         # 等待若干仿真步
         for _ in range(CTRL_DECIMATION):
@@ -181,6 +174,7 @@ class VLAEnv:
         info = {}
         self._step_count += 1
 
+        # 类似强化学习，gym的env.step的返回值
         return obs, reward, done, info
 
     def get_observation(self) -> dict:
@@ -210,20 +204,20 @@ class VLAEnv:
             hand_pos = self.data.body(self._hand_body_id).xpos.copy()
 
         return {
-            "image": image,              # (H, W, 3) uint8
-            "arm_qpos": arm_qpos,        # (7,) float64
+            "image":        image,         # (H, W, 3) uint8
+            "arm_qpos":     arm_qpos,      # (7,) float64
             "gripper_qpos": gripper_qpos,  # (2,) float64
             "gripper_ctrl": gripper_ctrl,  # (1,) float64
-            "cube_pos": cube_pos,        # (3,) float64
-            "hand_pos": hand_pos,        # (3,) float64
+            "cube_pos":     cube_pos,      # (3,) float64
+            "hand_pos":     hand_pos,      # (3,) float64
         }
 
     def _compute_reward(self) -> float:
         """计算抓取奖励：手爪越接近方块奖励越高。"""
         cube_pos = self.data.body(self._cube_body_id).xpos.copy()
         hand_pos = self.data.body(self._hand_body_id).xpos.copy()
-        distance = np.linalg.norm(cube_pos - hand_pos)
-        return float(-distance)
+        distance = np.linalg.norm(cube_pos - hand_pos) # 计算二范数
+        return float(-distance) # 相当于自己定义的奖励函数 reward = float(-distance)
 
     # ============================================================
     # 便利方法
@@ -288,25 +282,50 @@ class VLAEnv:
 # ============================================================
 # 快速测试
 # ============================================================
+TEST = 1
+if TEST:
+    if __name__ == "__main__":
+        env = VLAEnv(render=True)
+        mj_model = env.get_model()
+        mj_data = env.get_data()
 
-if __name__ == "__main__":
-    env = VLAEnv(render=True)
-    try:
-        obs = env.reset()
-        print("观测键:", obs.keys())
-        print("图像尺寸:", obs["image"].shape)
-        print("方块位置:", obs["cube_pos"])
-        print("手爪位置:", obs["hand_pos"])
-        print("手臂关节:", obs["arm_qpos"])
+        print(mj_model.nv)
+        jacp = np.zeros((3, mj_model.nv))
+        print(jacp.shape)
+        mat = jacp.T @ jacp  # @表示矩阵乘法， *是逐个元素相乘
+        print(mat.shape)
 
-        # 显示图像
-        for _ in range(200):
-            obs, reward, done, info = env.step(obs["arm_qpos"])
-            img_bgr = cv2.cvtColor(obs["image"], cv2.COLOR_RGB2BGR)
-            cv2.imshow("VLAEnv", img_bgr)
-            if cv2.waitKey(1) & 0xFF == 27:
-                break
+        _arm_joint_ids = [mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_JOINT, name) for name in ARM_JOINT_NAMES]
+        arm_qpos_adr = np.array([mj_model.jnt_qposadr[jid] for jid in _arm_joint_ids], dtype=np.int32)
 
-    finally:
-        env.close()
-        cv2.destroyAllWindows()
+        _actuator_ids = np.array([mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in ACTUATOR_NAMES], dtype=np.int32)
+        print(type(_arm_joint_ids))
+        print(arm_qpos_adr)
+        print(_actuator_ids)
+
+        _cube_body_id = mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_BODY, "red_cube")
+        cube_pos = mj_data.body(_cube_body_id).xpos.copy()
+
+        _hand_body_id = mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_BODY, "hand")
+        current = mj_data.xpos[_hand_body_id].copy()
+
+        print(_hand_body_id, current)
+        # try:
+        #     obs = env.reset()
+        #     print("观测键:", obs.keys())
+        #     print("图像尺寸:", obs["image"].shape)
+        #     print("方块位置:", obs["cube_pos"])
+        #     print("手爪位置:", obs["hand_pos"])
+        #     print("手臂关节:", obs["arm_qpos"])
+
+        #     # 显示图像
+        #     for _ in range(200):
+        #         obs, reward, done, info = env.step(obs["arm_qpos"])
+        #         img_bgr = cv2.cvtColor(obs["image"], cv2.COLOR_RGB2BGR)
+        #         cv2.imshow("VLAEnv", img_bgr)
+        #         if cv2.waitKey(1) & 0xFF == 27:
+        #             break
+
+        # finally:
+        #     env.close()
+        #     cv2.destroyAllWindows()

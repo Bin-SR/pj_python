@@ -2,8 +2,8 @@
 # =============================================================================
 # VLA 控制器模块
 # 提供 Panda 机械臂的运动控制:
-#   1. JointInterpolationController —— 关节空间平滑插值控制
-#   2. IKSolver —— 基于阻尼最小二乘的逆运动学求解器
+#   1. IKSolver —— 基于阻尼最小二乘的逆运动学求解器
+#   2. JointInterpolationController —— 关节空间平滑插值控制
 #   3. GraspTrajectoryGenerator —— 抓取轨迹生成器
 # =============================================================================
 
@@ -27,25 +27,31 @@ from vla.config import (
 # ============================================================
 
 class IKSolver:
-    """基于阻尼最小二乘 (Damped Least Squares) 的 IK 求解器。
+    """基于阻尼最小二乘的 IK 求解器。
 
-    使用 MuJoCo 的 Jacobian 计算关节修正量，迭代逼近目标位置。
-
-    重要: 求解过程中会临时修改 data.qpos 来计算前向运动学，
-    求解完成后会恢复原始 qpos，避免与仿真线程冲突。
+    关键设计: 使用独立的 MjData 副本进行 IK 计算，
+    完全隔离仿真线程，避免 MuJoCo 内部状态冲突。
     """
 
     def __init__(self,
                  model: mujoco.MjModel,
-                 data: mujoco.MjData,
+                 live_data: mujoco.MjData,
                  qpos_adr: np.ndarray,
                  dof_adr: np.ndarray,
                  body_id: int,
                  max_iter: int = IK_MAX_ITER,
                  tolerance: float = IK_TOLERANCE,
                  damping: float = IK_DAMPING):
+        """
+        Args:
+            model: MuJoCo 模型 (所有 data 共享)
+            live_data: 仿真线程使用的 live MjData (仅用于读取当前 qpos)
+            qpos_adr: (7,) 手臂关节在 qpos 中的地址
+            dof_adr:  (7,) 手臂关节在 DOF (nv) 中的地址
+            body_id: 末端 body 的 id (hand body)
+        """
         self.model = model
-        self.data = data
+        self.live_data = live_data
         self.qpos_adr = np.asarray(qpos_adr, dtype=np.int32)
         self.dof_adr = np.asarray(dof_adr, dtype=np.int32)
         self.body_id = body_id
@@ -53,7 +59,10 @@ class IKSolver:
         self.tolerance = tolerance
         self.damping = damping
 
-        # 预分配 Jacobian 数组 (3 行平移 + 3 行旋转)
+        # ---- 独立的 MjData 副本 (关键: 隔离 IK 与仿真线程) ----
+        self._ik_data = mujoco.MjData(model)
+
+        # 预分配 Jacobian 数组
         self._jac_pos = np.zeros((3, model.nv))
         self._jac_rot = np.zeros((3, model.nv))
 
@@ -63,64 +72,65 @@ class IKSolver:
 
         Args:
             target_pos: (3,) 世界坐标系下的目标位置
-            init_qpos: (7,) 初始关节角度 (None 则用当前 data.qpos 值)
+            init_qpos: (7,) 初始关节角度 (None 则从 live_data 读取)
         Returns:
             (7,) 关节角度解
         """
         target = np.asarray(target_pos, dtype=np.float64)
 
-        # ---- 保存原始 qpos (关键: 防止干扰仿真线程) ----
-        original_qpos = self.data.qpos[self.qpos_adr].copy()
+        # ---- 从 live_data 同步全量 qpos 到 IK 专用 data ----
+        # 必须同步完整 qpos 以保证 mj_forward 正确计算全域运动学
+        self._ik_data.qpos[:] = self.live_data.qpos[:]
+        self._ik_data.qvel[:] = 0.0  # IK 不需要速度
 
         # 设置初始关节角度
         if init_qpos is not None:
-            self.data.qpos[self.qpos_adr] = np.asarray(init_qpos, dtype=np.float64)
+            self._ik_data.qpos[self.qpos_adr] = np.asarray(
+                init_qpos, dtype=np.float64
+            )
 
-        # ---- IK 迭代 ----
+        # ---- IK 迭代 (全部在 ik_data 上操作, 不影响仿真) ----
         for iteration in range(self.max_iter):
-            # 前向运动学 (只读 xpos, 修改内部缓存)
-            mujoco.mj_forward(self.model, self.data)
+            # 前向运动学 (在 ik_data 上, 不影响 live_data)
+            mujoco.mj_forward(self.model, self._ik_data)
 
             # 当前末端位置
-            current = self.data.xpos[self.body_id].copy()
+            current = self._ik_data.xpos[self.body_id].copy()
 
             # 位置误差
             error = target - current
-            err_norm = np.linalg.norm(error)
-            if err_norm < self.tolerance:
+            if np.linalg.norm(error) < self.tolerance:
                 break
 
-            # 计算平移 Jacobian (3 x nv)
-            mujoco.mj_jacBody(self.model, self.data,
+            # 计算平移 Jacobian
+            mujoco.mj_jacBody(self.model, self._ik_data,
                               self._jac_pos, self._jac_rot,
                               self.body_id)
 
             # 只取参与 IK 的 DOF 列 (3 x 7)
             jac_sub = self._jac_pos[:, self.dof_adr]
 
-            # 阻尼最小二乘: delta_q = J^T (J J^T + lambda^2 I)^{-1} error
+            # 阻尼最小二乘
             jjt = jac_sub @ jac_sub.T
             damped = jjt + (self.damping ** 2) * np.eye(3)
             try:
                 delta_q = jac_sub.T @ np.linalg.solve(damped, error)
             except np.linalg.LinAlgError:
-                delta_q = jac_sub.T @ np.linalg.lstsq(damped, error, rcond=None)[0]
+                delta_q = jac_sub.T @ np.linalg.lstsq(
+                    damped, error, rcond=None
+                )[0]
 
-            # 更新关节角度 (使用 qpos 地址)
-            self.data.qpos[self.qpos_adr] += delta_q
+            # 更新 (在 ik_data 上)
+            self._ik_data.qpos[self.qpos_adr] += delta_q
 
             # 裁剪到关节限位
             for i, (lo, hi) in enumerate(JOINT_RANGES):
                 idx = self.qpos_adr[i]
-                self.data.qpos[idx] = np.clip(self.data.qpos[idx], lo, hi)
+                self._ik_data.qpos[idx] = np.clip(
+                    self._ik_data.qpos[idx], lo, hi
+                )
 
-        # 保存解
-        solution = self.data.qpos[self.qpos_adr].copy()
-
-        # ---- 恢复原始 qpos (关键: 不影响仿真状态) ----
-        self.data.qpos[self.qpos_adr] = original_qpos
-
-        return solution
+        return self._ik_data.qpos[self.qpos_adr].copy()
 
 
 # ============================================================

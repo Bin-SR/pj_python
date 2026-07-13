@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # =============================================================================
 # VLA 演示数据收集模块
 # 通过脚本化控制器生成抓取演示数据，用于训练策略网络。
@@ -52,39 +52,33 @@ class DemonstrationCollector:
         data = self.env.get_data()
 
         # ---- 阶段 1: 预抓取 ----
-        pregrasp_pos = actual_cube.copy()
-        pregrasp_pos[2] += PREGRASP_HEIGHT_OFFSET
-        current_qpos = data.qpos[qpos_adr].copy()
-        pregrasp_qpos = self.ik.solve(pregrasp_pos, init_qpos=current_qpos)
+        pregrasp_pos = actual_cube.copy()           # 获取当前cube的坐标，作为预抓取的目标，末端到达的位置
+        pregrasp_pos[2] += PREGRASP_HEIGHT_OFFSET   # 给z坐标增加一个偏置
+        current_qpos = data.qpos[qpos_adr].copy()   # 获取当前关节角度
+            # 当前的current_qpos表示机械臂初始的位置，准备向物体上方移动
+        pregrasp_qpos = self.ik.solve(pregrasp_pos, init_qpos=current_qpos)  # 经过ik.solve得到的solution即关节角
 
         start_qpos = data.qpos[qpos_adr].copy()
         for i in range(collect_steps):
             alpha = (i + 1) / collect_steps
-            interp_qpos = start_qpos + (pregrasp_qpos - start_qpos) * alpha
-
-            obs, _, _, _ = self.env.step(
-                self._make_action(interp_qpos, 0.0)
-            )
-            samples.append(self._build_sample(
-                obs, interp_qpos, 0.0, instruction
-            ))
+            interp_qpos = start_qpos + (pregrasp_qpos - start_qpos) * alpha  # 即缓冲机制，(1 - alpha) * start + alpha * tar
+            # 在step内进行了data.ctrl的赋值
+            obs, _, _, _ = self.env.step(self._make_action(interp_qpos, 0.0))       # self._make_action的返回值作为action
+            samples.append(self._build_sample(obs, interp_qpos, 0.0, instruction))  # self._build_sample的返回值为当前的状态数据
 
         # ---- 阶段 2: 下降抓取 ----
         grasp_pos = actual_cube.copy()
-        grasp_pos[2] += GRASP_HEIGHT_OFFSET + 0.01
+        grasp_pos[2] += GRASP_HEIGHT_OFFSET + 0.01 # 给z坐标增加一个偏置
         current_qpos = data.qpos[qpos_adr].copy()
-        grasp_qpos = self.ik.solve(grasp_pos, init_qpos=current_qpos)
+            # 当前的current_qpos表示机械臂末端已经到了物体上方，准备下降夹取
+        grasp_qpos = self.ik.solve(grasp_pos, init_qpos=current_qpos)   
 
         for i in range(collect_steps):
             alpha = (i + 1) / collect_steps
             interp_qpos = pregrasp_qpos + (grasp_qpos - pregrasp_qpos) * alpha
 
-            obs, _, _, _ = self.env.step(
-                self._make_action(interp_qpos, 0.0)
-            )
-            samples.append(self._build_sample(
-                obs, interp_qpos, 0.0, instruction
-            ))
+            obs, _, _, _ = self.env.step(self._make_action(interp_qpos, 0.0))
+            samples.append(self._build_sample(obs, interp_qpos, 0.0, instruction))
 
         # 闭合夹爪 (逐步)
         close_steps = max(collect_steps // 2, 5)
@@ -92,12 +86,8 @@ class DemonstrationCollector:
             alpha = (i + 1) / close_steps
             gripper_val = alpha * 255.0
 
-            obs, _, _, _ = self.env.step(
-                self._make_action(grasp_qpos, gripper_val)
-            )
-            samples.append(self._build_sample(
-                obs, grasp_qpos, 255.0, instruction
-            ))
+            obs, _, _, _ = self.env.step(self._make_action(grasp_qpos, gripper_val))
+            samples.append(self._build_sample(obs, grasp_qpos, 255.0, instruction))
 
         # ---- 阶段 3: 抬升 ----
         lift_pos = actual_cube.copy()
@@ -109,12 +99,8 @@ class DemonstrationCollector:
             alpha = (i + 1) / collect_steps
             interp_qpos = grasp_qpos + (lift_qpos - grasp_qpos) * alpha
 
-            obs, _, _, _ = self.env.step(
-                self._make_action(interp_qpos, 255.0)
-            )
-            samples.append(self._build_sample(
-                obs, interp_qpos, 255.0, instruction
-            ))
+            obs, _, _, _ = self.env.step(self._make_action(interp_qpos, 255.0))
+            samples.append(self._build_sample(obs, interp_qpos, 255.0, instruction))
 
         return samples
 
@@ -122,8 +108,8 @@ class DemonstrationCollector:
     def _make_action(arm_qpos: np.ndarray, gripper_ctrl: float) -> np.ndarray:
         """构造 (8,) 动作数组。"""
         act = np.zeros(8, dtype=np.float64)
-        act[:7] = np.asarray(arm_qpos, dtype=np.float64)
-        act[7] = gripper_ctrl
+        act[:7] = np.asarray(arm_qpos, dtype=np.float64)  # arm
+        act[7] = gripper_ctrl                             # gripper 一共8个actuator
         return act
 
     @staticmethod
@@ -136,7 +122,7 @@ class DemonstrationCollector:
         Args:
             obs: 环境观测
             target_arm_qpos: (7,) 目标手臂关节角度
-            target_gripper: 目标夹爪执行器值
+            target_gripper : (1,) 目标夹爪执行器值
             instruction: 语言指令
         """
         action = np.zeros(8, dtype=np.float32)
@@ -144,13 +130,13 @@ class DemonstrationCollector:
         action[7] = float(target_gripper)
 
         return {
-            "image": obs["image"].copy(),
-            "arm_qpos": obs["arm_qpos"].astype(np.float32).copy(),
+            "image":        obs["image"].copy(),
+            "arm_qpos":     obs["arm_qpos"].astype(np.float32).copy(),
             "gripper_qpos": obs["gripper_qpos"].astype(np.float32).copy(),
             "gripper_ctrl": obs["gripper_ctrl"].astype(np.float32).copy(),
-            "action": action,
-            "instruction": instruction,
-            "cube_pos": obs["cube_pos"].astype(np.float32).copy(),
+            "action":       action,
+            "instruction":  instruction,
+            "cube_pos":     obs["cube_pos"].astype(np.float32).copy(),
         }
 
     def collect_dataset(self,
@@ -165,9 +151,11 @@ class DemonstrationCollector:
             instructions = DEFAULT_INSTRUCTIONS
 
         all_samples = []
+        # 创建独立的随机数生成器
         rng = np.random.RandomState(42)
 
         for ep in range(num_episodes):
+            # 生成cube_x_range区间的随机数， rng.uniform(low, high)
             cx = rng.uniform(*cube_x_range)
             cy = rng.uniform(*cube_y_range)
             cube_pos = np.array([cx, cy])

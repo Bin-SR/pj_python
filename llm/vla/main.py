@@ -173,6 +173,7 @@ def cmd_test(args):
 
 
 def main():
+    # 创建一个参数解释器，来读取命令行参数
     parser = argparse.ArgumentParser(
         description="VLA 自主抓取系统 - Franka Emika Panda + MuJoCo",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -185,33 +186,36 @@ def main():
   python main.py test                       运行模块测试
         """,
     )
-
+ 
+    # 创建子命令，如python main.py XXXX
+    # XXXX就是子命令(args.command)，可以说train, demo, run, test
     subparsers = parser.add_subparsers(dest="command", help="可用命令")
 
-    # ---- demo ----
+    # ---- demo ---- : 创建一个demo的子命令
     demo_parser = subparsers.add_parser("demo", help="收集演示数据")
-    demo_parser.add_argument("--episodes", type=int, default=50, help="演示轮数 (默认: 50)")
-    demo_parser.add_argument("--cube-x-range", type=float, nargs=2, default=[0.35, 0.65], help="方块 x 范围")
-    demo_parser.add_argument("--cube-y-range", type=float, nargs=2, default=[-0.2, 0.2], help="方块 y 范围")
-    demo_parser.add_argument("--output", type=str, default="demo_data.pkl", help="输出文件名")
-    demo_parser.add_argument("--headless", action="store_true", help="无头模式 (不显示可视化)")
+    demo_parser.add_argument("--episodes",      type=int, default=50, help="演示轮数 (默认: 50)")
+    demo_parser.add_argument("--cube-x-range",  type=float, nargs=2, default=[0.35, 0.65], help="方块 x 范围")
+    demo_parser.add_argument("--cube-y-range",  type=float, nargs=2, default=[-0.2, 0.2], help="方块 y 范围")
+    demo_parser.add_argument("--output",        type=str, default="demo_data.pkl", help="输出文件名")
+    demo_parser.add_argument("--headless",      action="store_true", help="无头模式 (不显示可视化)")
 
     # ---- train ----
     train_parser = subparsers.add_parser("train", help="训练 VLA 策略网络")
-    train_parser.add_argument("--data", type=str, default="demo_data.pkl", help="演示数据文件")
-    train_parser.add_argument("--epochs", type=int, default=50, help="训练轮数 (默认: 50)")
-    train_parser.add_argument("--batch-size", type=int, default=32, help="批大小 (默认: 32)")
-    train_parser.add_argument("--device", type=str, default="cuda", help="训练设备 (默认: cuda)")
+    train_parser.add_argument("--data",         type=str, default="demo_data.pkl", help="演示数据文件")
+    train_parser.add_argument("--epochs",       type=int, default=50, help="训练轮数 (默认: 50)")
+    train_parser.add_argument("--batch-size",   type=int, default=32, help="批大小 (默认: 32)")
+    train_parser.add_argument("--device",       type=str, default="cuda", help="训练设备 (默认: cuda)")
 
     # ---- run ----
     run_parser = subparsers.add_parser("run", help="运行自主抓取")
-    run_parser.add_argument("--instruction", type=str, default="grasp the red cube", help="语言指令")
-    run_parser.add_argument("--script", action="store_true", help="使用脚本化抓取 (无需训练模型)")
-    run_parser.add_argument("--model", type=str, default="vla_policy.pt", help="模型文件名")
+    run_parser.add_argument("--instruction",    type=str, default="grasp the red cube", help="语言指令")
+    run_parser.add_argument("--script",         action="store_true", help="使用脚本化抓取 (无需训练模型)")
+    run_parser.add_argument("--model",          type=str, default="vla_policy.pt", help="模型文件名")
 
     # ---- test ----
     test_parser = subparsers.add_parser("test", help="运行模块测试")
-
+    
+    # 读取命令行输入，保存到args对象
     args = parser.parse_args()
 
     if args.command == "demo":
