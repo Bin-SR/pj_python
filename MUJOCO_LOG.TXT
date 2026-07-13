@@ -1,0 +1,9 @@
+Sun Jul 12 11:43:53 2026
+WARNING: Insufficient arena memory for the number of constraints generated. Increase arena memory allocation above 14M bytes. Time = 1.1000.
+
+Sun Jul 12 14:28:15 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 2.6850.
+
+Sun Jul 12 18:41:33 2026
+WARNING: mixed solref format, replacing with default
+
